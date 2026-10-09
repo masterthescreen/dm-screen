@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 32 28% 94%;
+    --foreground: 30 35% 12%;
+    --card: 34 40% 97%;
+    --card-foreground: 30 35% 12%;
+    --popover: 34 40% 97%;
+    --popover-foreground: 30 35% 12%;
+    --primary: 356 54% 31%;
+    --primary-foreground: 34 60% 95%;
+    --secondary: 38 42% 88%;
+    --secondary-foreground: 30 35% 15%;
+    --muted: 36 30% 88%;
+    --muted-foreground: 30 15% 38%;
+    --accent: 38 78% 34%;
+    --accent-foreground: 34 60% 95%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 34 60% 95%;
+    --border: 34 24% 78%;
+    --input: 34 24% 78%;
+    --ring: 38 70% 38%;
+    --radius: 0.4rem;
+  }
+
+  .dark {
+    --background: 28 22% 7%;
+    --foreground: 38 40% 90%;
+    --card: 28 22% 10%;
+    --card-foreground: 38 40% 90%;
+    --popover: 28 22% 9%;
+    --popover-foreground: 38 40% 90%;
+    --primary: 42 65% 52%;
+    --primary-foreground: 28 30% 10%;
+    --secondary: 28 18% 16%;
+    --secondary-foreground: 38 40% 88%;
+    --muted: 28 16% 15%;
+    --muted-foreground: 36 18% 62%;
+    --accent: 42 70% 58%;
+    --accent-foreground: 28 40% 10%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 38 40% 94%;
+    --border: 28 16% 20%;
+    --input: 28 16% 20%;
+    --ring: 42 65% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 10% 10%, hsla(42, 65%, 52%, 0.06), transparent 40%),
+      radial-gradient(circle at 90% 85%, hsla(356, 54%, 42%, 0.07), transparent 45%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+  }
+  .font-accent {
+    font-family: var(--font-accent);
+  }
+}
+
+.parchment-texture {
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, hsla(30, 30%, 20%, 0.012) 3px),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, hsla(30, 30%, 20%, 0.012) 3px);
+}
+
+.scrollbar-ornate::-webkit-scrollbar {
+  width: 10px;
+}
+.scrollbar-ornate::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+.scrollbar-ornate::-webkit-scrollbar-thumb {
+  background: hsl(var(--accent) / 0.5);
+  border-radius: 999px;
+}

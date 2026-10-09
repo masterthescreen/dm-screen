@@ -2,25 +2,22 @@
 
 import Link from "next/link";
 import { useServerState } from "@/lib/server-storage";
-import { GMNote, Player, Note } from "@/types";
+import { usePlayers } from "@/lib/use-players";
+import { GMNote } from "@/types";
 import { GMNotes } from "@/components/notebooks/gm-notes";
 import { Loader2 } from "lucide-react";
 
 export default function NotebooksPage() {
-  const [gmNotes, setGmNotes, h1] = useServerState<GMNote[]>("codex.gmnotes", []);
-  const [players, setPlayers, h2] = useServerState<Player[]>("codex.players", []);
+  const [gmNotes, setGmNotes, hydrated] = useServerState<GMNote[]>("codex.gmnotes", []);
+  const { players, loaded, sendNote } = usePlayers();
 
-  if (!h1 || !h2) {
+  if (!hydrated || !loaded) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-6 w-6 animate-spin text-accent" />
       </div>
     );
   }
-
-  const sendNoteToPlayer = (playerId: string, note: Note) => {
-    setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, notes: [note, ...p.notes] } : p)));
-  };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -30,7 +27,7 @@ export default function NotebooksPage() {
           Your private journal. Send any note to a player&apos;s notebook.{" "}
           {players.length === 0 && (
             <>
-              No players yet —{" "}
+              No players yet &mdash;{" "}
               <Link href="/players" className="underline text-primary">
                 add players
               </Link>{" "}
@@ -39,7 +36,7 @@ export default function NotebooksPage() {
           )}
         </p>
       </div>
-      <GMNotes notes={gmNotes} onChange={setGmNotes} players={players} onSend={sendNoteToPlayer} />
+      <GMNotes notes={gmNotes} onChange={setGmNotes} players={players} onSend={sendNote} />
     </div>
   );
 }

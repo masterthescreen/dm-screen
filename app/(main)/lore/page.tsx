@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useServerState } from "@/lib/server-storage";
-import { World, Player } from "@/types";
+import { World } from "@/types";
+import { usePlayers } from "@/lib/use-players";
 import { sampleWorld } from "@/lib/lore-data";
 import { findEntity, updateWorld, addEntity, deleteEntity } from "@/lib/lore-ops";
 import { LoreTree, Selection } from "@/components/lore/lore-tree";
@@ -11,7 +12,7 @@ import { Loader2 } from "lucide-react";
 
 export default function LorePage() {
   const [world, setWorld, hydrated] = useServerState<World>("codex.world", sampleWorld());
-  const [players, , playersHydrated] = useServerState<Player[]>("codex.players", []);
+  const { players, loaded: playersHydrated } = usePlayers();
   const [selection, setSelection] = useState<Selection>({ level: "world" });
 
   if (!hydrated || !playersHydrated) {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useServerState } from "@/lib/server-storage";
-import { Monster, Encounter, Combatant, Player } from "@/types";
+import { Monster, Encounter, Combatant } from "@/types";
+import { usePlayers } from "@/lib/use-players";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonsterList } from "@/components/combat/monster-list";
 import { EncounterBuilder } from "@/components/combat/encounter-builder";
@@ -12,7 +13,7 @@ export default function CombatPage() {
   const [monsters, setMonsters, h1] = useServerState<Monster[]>("codex.monsters", []);
   const [encounters, setEncounters, h2] = useServerState<Encounter[]>("codex.encounters", []);
   const [combatants, setCombatants, h3] = useServerState<Combatant[]>("codex.combatants", []);
-  const [players, , h4] = useServerState<Player[]>("codex.players", []);
+  const { players, loaded: h4 } = usePlayers();
 
   if (!h1 || !h2 || !h3 || !h4) {
     return (

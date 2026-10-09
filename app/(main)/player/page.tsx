@@ -1,21 +1,17 @@
 "use client";
 
-import { useServerState } from "@/lib/server-storage";
-import { useSession } from "@/lib/auth";
-import { Player, World } from "@/types";
-import { collectSharedLore } from "@/lib/shared-lore";
-import { SharedLoreView } from "@/components/player/shared-lore-view";
+import { api } from "@/lib/api";
+import { useMe } from "@/components/me-provider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CharacterSheetView } from "@/components/player/character-sheet-view";
 import { MyNotebook } from "@/components/player/my-notebook";
+import { SharedLoreView } from "@/components/player/shared-lore-view";
 import { Loader2 } from "lucide-react";
 
 export default function PlayerPage() {
-  const [session, , hSession] = useSession();
-  const [players, setPlayers, hPlayers] = useServerState<Player[]>("codex.players", []);
-  const [world, , hWorld] = useServerState<World | null>("codex.world", null);
+  const { me, loaded, refresh } = useMe();
 
-  if (!hSession || !hPlayers || !hWorld) {
+  if (!loaded || !me || me.role !== "player") {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -23,26 +19,21 @@ export default function PlayerPage() {
     );
   }
 
-  const player = players.find((p) => p.id === session?.playerId);
+  const { player, lore } = me;
 
-  if (!player) {
-    return (
-      <div className="flex items-center justify-center h-screen text-center px-6">
-        <p className="text-muted-foreground italic font-accent">
-          Your character record could not be found. Ask your GM to check your player setup.
-        </p>
-      </div>
-    );
-  }
-
-  const sharedLore = collectSharedLore(world, player.id);
-
-  const updateCharacter = (patch: Partial<Player["character"]>) => {
-    setPlayers((prev) => prev.map((p) => (p.id === player.id ? { ...p, character: { ...p.character, ...patch } } : p)));
+  const saveCharacter = async (patch: { currentHp?: number; equipment?: string; backstory?: string }) => {
+    await api("/api/me/character", { method: "PATCH", body: patch });
+    await refresh();
   };
 
-  const updateNotes = (notes: Player["notes"]) => {
-    setPlayers((prev) => prev.map((p) => (p.id === player.id ? { ...p, notes } : p)));
+  const addNote = async (title: string, content: string) => {
+    await api("/api/me/notes", { method: "POST", body: { title, content } });
+    await refresh();
+  };
+
+  const removeNote = async (id: string) => {
+    await api(`/api/me/notes/${id}`, { method: "DELETE" });
+    await refresh();
   };
 
   return (
@@ -51,19 +42,19 @@ export default function PlayerPage() {
         <TabsList className="mb-6">
           <TabsTrigger value="character">Character Sheet</TabsTrigger>
           <TabsTrigger value="notebook">My Notebook ({player.notes.length})</TabsTrigger>
-          <TabsTrigger value="lore">Lore ({sharedLore.length})</TabsTrigger>
+          <TabsTrigger value="lore">Lore ({lore.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="character">
-          <CharacterSheetView player={player} onChange={updateCharacter} />
+          <CharacterSheetView player={player} onSave={saveCharacter} />
         </TabsContent>
 
         <TabsContent value="notebook">
-          <MyNotebook notes={player.notes} onChange={updateNotes} />
+          <MyNotebook notes={player.notes} onAdd={addNote} onRemove={removeNote} />
         </TabsContent>
 
         <TabsContent value="lore">
-          <SharedLoreView items={sharedLore} />
+          <SharedLoreView items={lore} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Player } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,14 +8,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CharacterSheetViewProps {
   player: Player;
-  onChange: (patch: Partial<Player["character"]>) => void;
+  // Saves one of the fields a player may edit themselves.
+  onSave: (patch: { currentHp?: number; equipment?: string; backstory?: string }) => Promise<void>;
 }
 
 const stats = ["str", "dex", "con", "int", "wis", "cha"] as const;
 
-export function CharacterSheetView({ player, onChange }: CharacterSheetViewProps) {
+export function CharacterSheetView({ player, onSave }: CharacterSheetViewProps) {
   const c = player.character;
-  const hpPct = c.maxHp > 0 ? Math.max(0, Math.min(100, (c.currentHp / c.maxHp) * 100)) : 0;
+
+  // Edit locally, save when the field loses focus, so live updates don't fight typing.
+  const [hp, setHp] = useState(String(c.currentHp));
+  const [equipment, setEquipment] = useState(c.equipment);
+  const [backstory, setBackstory] = useState(c.backstory);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editing !== "hp") setHp(String(c.currentHp));
+    if (editing !== "equipment") setEquipment(c.equipment);
+    if (editing !== "backstory") setBackstory(c.backstory);
+  }, [c.currentHp, c.equipment, c.backstory, editing]);
+
+  const hpNum = parseInt(hp, 10);
+  const shownHp = Number.isFinite(hpNum) ? hpNum : c.currentHp;
+  const hpPct = c.maxHp > 0 ? Math.max(0, Math.min(100, (shownHp / c.maxHp) * 100)) : 0;
+
+  const commit = async (patch: Parameters<CharacterSheetViewProps["onSave"]>[0]) => {
+    setEditing(null);
+    await onSave(patch);
+  };
 
   return (
     <div className="space-y-5">
@@ -46,9 +68,13 @@ export function CharacterSheetView({ player, onChange }: CharacterSheetViewProps
           <div className="flex items-center gap-2">
             <Input
               type="number"
+              aria-label="Current HP"
               className="w-24"
-              value={c.currentHp}
-              onChange={(e) => onChange({ currentHp: parseInt(e.target.value, 10) || 0 })}
+              value={hp}
+              onFocus={() => setEditing("hp")}
+              onChange={(e) => setHp(e.target.value)}
+              onBlur={() => void commit({ currentHp: Number.isFinite(hpNum) ? hpNum : c.currentHp })}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
             />
             <span className="text-sm text-muted-foreground">/ {c.maxHp} HP</span>
           </div>
@@ -71,7 +97,14 @@ export function CharacterSheetView({ player, onChange }: CharacterSheetViewProps
           <CardTitle className="text-sm font-display">Equipment</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea rows={3} value={c.equipment} onChange={(e) => onChange({ equipment: e.target.value })} />
+          <Textarea
+            rows={3}
+            aria-label="Equipment"
+            value={equipment}
+            onFocus={() => setEditing("equipment")}
+            onChange={(e) => setEquipment(e.target.value)}
+            onBlur={() => void commit({ equipment })}
+          />
         </CardContent>
       </Card>
 
@@ -80,13 +113,20 @@ export function CharacterSheetView({ player, onChange }: CharacterSheetViewProps
           <CardTitle className="text-sm font-display">Backstory</CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea rows={4} value={c.backstory} onChange={(e) => onChange({ backstory: e.target.value })} />
+          <Textarea
+            rows={4}
+            aria-label="Backstory"
+            value={backstory}
+            onFocus={() => setEditing("backstory")}
+            onChange={(e) => setBackstory(e.target.value)}
+            onBlur={() => void commit({ backstory })}
+          />
         </CardContent>
       </Card>
 
       <p className="text-xs text-muted-foreground font-accent italic">
         Your GM controls your class, race, level, AC, max HP, and ability scores. You can update your current HP,
-        equipment, and backstory here.
+        equipment, and backstory here. Changes save when you click away.
       </p>
     </div>
   );

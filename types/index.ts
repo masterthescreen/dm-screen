@@ -154,15 +154,16 @@ export interface Player {
   id: string;
   playerName: string;
   characterName: string;
-  passcode: string;
   character: CharacterSheet;
   notes: Note[];
+  rolls: RollRecord[]; // this player's own dice history (private to them and the GM)
+}
+
+// Server-side record. `codeHash` never leaves the server.
+export interface StoredPlayer extends Player {
+  codeHash: string; // keyed hash of the player's access code
+  codeVersion: number; // bumped when the code is reset, invalidating old sessions
 }
 
 // ---------- Auth ----------
 export type Role = "gm" | "player";
-
-export interface Session {
-  role: Role;
-  playerId?: string;
-}

@@ -1,31 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "@/lib/api";
 
 const POLL_INTERVAL_MS = 4000;
 const LOCAL_WRITE_GRACE_MS = 2500;
 const WRITE_DEBOUNCE_MS = 500;
 
+// "codex.world" -> "world". Only GM-only data sets are reachable this way.
+const shortKey = (key: string) => key.replace(/^codex\./, "");
+
 async function fetchState<T>(key: string, fallback: T): Promise<T> {
-  const res = await fetch(`/api/state/${key}`, { cache: "no-store" });
-  if (!res.ok) return fallback;
-  const data = await res.json();
+  const data = await api<{ value: T | null }>(`/api/gm/${shortKey(key)}`);
   return (data.value ?? fallback) as T;
 }
 
 async function pushState<T>(key: string, value: T): Promise<void> {
-  await fetch(`/api/state/${key}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ value }),
-  });
+  await api(`/api/gm/${shortKey(key)}`, { method: "PUT", body: { value } });
 }
 
 /**
- * Drop-in replacement for useLocalStorage that persists to the shared server
- * instead of the browser's local storage, so a GM and their players see the
- * same live data across separate devices. Polls periodically to pick up
- * changes made elsewhere, and debounces outgoing writes.
+ * GM-side persistence for campaign data (world, monsters, encounters, ...).
+ * Syncs with the server, debounces writes, and polls so a second GM device
+ * stays current. The server only allows the signed-in GM to use this.
  */
 export function useServerState<T>(key: string, fallback: T) {
   const [value, setValue] = useState<T>(fallback);
@@ -38,20 +35,24 @@ export function useServerState<T>(key: string, fallback: T) {
   useEffect(() => {
     let cancelled = false;
 
-    fetchState(key, fallback).then((v) => {
-      if (cancelled) return;
-      setValue(v);
-      setHydrated(true);
-    });
+    fetchState(key, fallback)
+      .then((v) => {
+        if (cancelled) return;
+        setValue(v);
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (!cancelled) setHydrated(true);
+      });
 
     const interval = setInterval(() => {
       if (Date.now() - lastLocalWriteAt.current < LOCAL_WRITE_GRACE_MS) return;
-      fetchState(key, fallback).then((v) => {
-        if (cancelled) return;
-        if (JSON.stringify(v) !== JSON.stringify(valueRef.current)) {
-          setValue(v);
-        }
-      });
+      fetchState(key, fallback)
+        .then((v) => {
+          if (cancelled) return;
+          if (JSON.stringify(v) !== JSON.stringify(valueRef.current)) setValue(v);
+        })
+        .catch(() => undefined);
     }, POLL_INTERVAL_MS);
 
     return () => {
@@ -68,7 +69,7 @@ export function useServerState<T>(key: string, fallback: T) {
         lastLocalWriteAt.current = Date.now();
         if (writeTimer.current) clearTimeout(writeTimer.current);
         writeTimer.current = setTimeout(() => {
-          pushState(key, resolved);
+          pushState(key, resolved).catch(() => undefined);
         }, WRITE_DEBOUNCE_MS);
         return resolved;
       });

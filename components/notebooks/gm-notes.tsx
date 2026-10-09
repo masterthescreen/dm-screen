@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GMNote, Player, Note } from "@/types";
+import { GMNote, Player } from "@/types";
 import { uid } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ interface GMNotesProps {
   notes: GMNote[];
   onChange: (notes: GMNote[]) => void;
   players: Player[];
-  onSend: (playerId: string, note: Note) => void;
+  onSend: (playerId: string, title: string, content: string) => Promise<void>;
 }
 
 function blankNote(): GMNote {
@@ -41,16 +41,19 @@ export function GMNotes({ notes, onChange, players, onSend }: GMNotesProps) {
     setTagInput("");
   };
 
-  const sendNote = (note: GMNote) => {
+  const [sent, setSent] = useState<Record<string, string>>({});
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  const sendNote = async (note: GMNote) => {
     const playerId = sendTarget[note.id];
     if (!playerId) return;
-    onSend(playerId, {
-      id: uid(),
-      title: note.title,
-      content: note.content,
-      createdAt: new Date().toISOString(),
-      fromGM: true,
-    });
+    setSendError(null);
+    try {
+      await onSend(playerId, note.title, note.content);
+      setSent((prev) => ({ ...prev, [note.id]: playerId }));
+    } catch {
+      setSendError("Couldn't send that note. Try again.");
+    }
   };
 
   return (
@@ -91,6 +94,7 @@ export function GMNotes({ notes, onChange, players, onSend }: GMNotesProps) {
 
       <div className="space-y-3">
         <h3 className="font-display text-lg font-semibold">GM Journal ({notes.length})</h3>
+        {sendError && <p className="text-sm text-destructive">{sendError}</p>}
         <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-ornate pr-1">
           {notes.length === 0 && <p className="text-sm text-muted-foreground italic font-accent">No notes yet.</p>}
           {notes.map((note) => (
@@ -129,10 +133,15 @@ export function GMNotes({ notes, onChange, players, onSend }: GMNotesProps) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button size="sm" variant="outline" onClick={() => sendNote(note)} disabled={!sendTarget[note.id]}>
+                    <Button size="sm" variant="outline" onClick={() => void sendNote(note)} disabled={!sendTarget[note.id]}>
                       <Send className="h-3.5 w-3.5 mr-1.5" /> Send
                     </Button>
                   </div>
+                )}
+                {sent[note.id] && (
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    Sent to {players.find((p) => p.id === sent[note.id])?.characterName ?? "player"}.
+                  </p>
                 )}
               </CardContent>
             </Card>

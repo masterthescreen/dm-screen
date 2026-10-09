@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Note } from "@/types";
-import { uid } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,20 +11,24 @@ import { Plus, Trash } from "lucide-react";
 
 interface MyNotebookProps {
   notes: Note[];
-  onChange: (notes: Note[]) => void;
+  onAdd: (title: string, content: string) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
 }
 
-export function MyNotebook({ notes, onChange }: MyNotebookProps) {
+export function MyNotebook({ notes, onAdd, onRemove }: MyNotebookProps) {
   const [draft, setDraft] = useState({ title: "", content: "" });
+  const [busy, setBusy] = useState(false);
 
-  const addNote = () => {
-    if (!draft.title.trim()) return;
-    const note: Note = { id: uid(), title: draft.title, content: draft.content, createdAt: new Date().toISOString() };
-    onChange([note, ...notes]);
-    setDraft({ title: "", content: "" });
+  const addNote = async () => {
+    if (!draft.title.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onAdd(draft.title, draft.content);
+      setDraft({ title: "", content: "" });
+    } finally {
+      setBusy(false);
+    }
   };
-
-  const removeNote = (id: string) => onChange(notes.filter((n) => n.id !== id));
 
   return (
     <div className="space-y-5">
@@ -41,7 +44,7 @@ export function MyNotebook({ notes, onChange }: MyNotebookProps) {
           value={draft.content}
           onChange={(e) => setDraft({ ...draft, content: e.target.value })}
         />
-        <Button size="sm" onClick={addNote} disabled={!draft.title.trim()}>
+        <Button size="sm" onClick={addNote} disabled={!draft.title.trim() || busy}>
           <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Note
         </Button>
       </div>
@@ -59,9 +62,12 @@ export function MyNotebook({ notes, onChange }: MyNotebookProps) {
                   </Badge>
                 )}
               </div>
-              <Button variant="ghost" size="sm" onClick={() => removeNote(note.id)}>
-                <Trash className="h-3.5 w-3.5 text-destructive" />
-              </Button>
+              {/* Notes sent by the GM can't be deleted by the player. */}
+              {!note.fromGM && (
+                <Button variant="ghost" size="sm" onClick={() => void onRemove(note.id)} aria-label={`Delete note ${note.title}`}>
+                  <Trash className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{note.content}</p>

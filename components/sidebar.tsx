@@ -4,9 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, Swords, Dices, FileText, Scroll, User, Users, Crown, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSession } from "@/lib/auth";
-import { useServerState } from "@/lib/server-storage";
-import { Player } from "@/types";
+import { useMe } from "@/components/me-provider";
 
 const gmNavItems = [
   { href: "/", label: "The Hearth", icon: Scroll },
@@ -25,15 +23,13 @@ const playerNavItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [session, setSession] = useSession();
-  const [players] = useServerState<Player[]>("codex.players", []);
+  const { me, logout } = useMe();
 
-  const isGm = session?.role === "gm";
+  const isGm = me?.role === "gm";
   const navItems = isGm ? gmNavItems : playerNavItems;
-  const currentPlayer = players.find((p) => p.id === session?.playerId);
 
-  const logout = () => {
-    setSession(null);
+  const handleLogout = async () => {
+    await logout();
     router.replace("/login");
   };
 
@@ -65,7 +61,7 @@ export function Sidebar() {
         <p className="text-xs text-muted-foreground font-accent italic">
           &ldquo;No plan survives contact with the party.&rdquo;
         </p>
-        {session && (
+        {me && (
           <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
             <div className="flex items-center gap-2 min-w-0">
               {isGm ? (
@@ -74,13 +70,14 @@ export function Sidebar() {
                 <User className="h-4 w-4 text-accent shrink-0" />
               )}
               <span className="text-xs font-medium truncate">
-                {isGm ? "Game Master" : currentPlayer?.characterName || "Player"}
+                {me.role === "gm" ? "Game Master" : me.player.characterName || "Player"}
               </span>
             </div>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="text-muted-foreground hover:text-destructive shrink-0"
               title="Log out"
+              aria-label="Log out"
             >
               <LogOut className="h-4 w-4" />
             </button>

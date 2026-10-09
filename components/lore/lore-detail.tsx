@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Trash } from "lucide-react";
+import { Trash, Share } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Selection } from "./lore-tree";
-import { City, Continent, Kingdom, Person, Shop, World } from "@/types";
+import { City, Continent, Kingdom, Person, Player, Shop, World } from "@/types";
 
 type Entity = World | Continent | Kingdom | City | Shop | Person;
 
@@ -15,6 +16,7 @@ interface LoreDetailProps {
   entity: Entity | null;
   onChange: (patch: Partial<Entity>) => void;
   onDelete: () => void;
+  players: Player[];
 }
 
 const levelLabels: Record<Selection["level"], string> = {
@@ -26,7 +28,7 @@ const levelLabels: Record<Selection["level"], string> = {
   person: "Person",
 };
 
-export function LoreDetail({ selection, entity, onChange, onDelete }: LoreDetailProps) {
+export function LoreDetail({ selection, entity, onChange, onDelete, players }: LoreDetailProps) {
   if (!entity) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground italic font-accent">
@@ -36,6 +38,11 @@ export function LoreDetail({ selection, entity, onChange, onDelete }: LoreDetail
   }
 
   const e = entity as unknown as Record<string, string>;
+  const sharedWith: string[] = (entity as { sharedWith?: string[] }).sharedWith ?? [];
+
+  const setShared = (ids: string[]) => onChange({ sharedWith: ids } as Partial<Entity>);
+  const toggleShared = (playerId: string, on: boolean) =>
+    setShared(on ? Array.from(new Set([...sharedWith, playerId])) : sharedWith.filter((id) => id !== playerId));
 
   return (
     <div className="p-8 max-w-2xl space-y-5">
@@ -115,6 +122,47 @@ export function LoreDetail({ selection, entity, onChange, onDelete }: LoreDetail
           </div>
         </>
       )}
+
+      <div className="rounded-md border border-border/70 bg-card/60 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-sm font-semibold flex items-center gap-2">
+            <Share className="h-4 w-4 text-accent" /> Share with players
+          </h3>
+          {players.length > 0 && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShared(players.map((p) => p.id))}>
+                Everyone
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShared([])} disabled={sharedWith.length === 0}>
+                Nobody
+              </Button>
+            </div>
+          )}
+        </div>
+        {players.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Add players in the Players section first, then choose who can see this entry.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {players.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={sharedWith.includes(p.id)}
+                  onCheckedChange={(v) => toggleShared(p.id, v === true)}
+                />
+                <span>
+                  {p.characterName || "Unnamed"} <span className="text-muted-foreground">({p.playerName})</span>
+                </span>
+              </label>
+            ))}
+            <p className="text-xs text-muted-foreground">
+              Players see this entry&apos;s name and description{selection.level === "person" ? " (never the GM-only secrets)" : ""}
+              . Sharing one entry doesn&apos;t share the entries inside it.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

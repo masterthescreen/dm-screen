@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useServerState } from "@/lib/server-storage";
-import { World } from "@/types";
+import { World, Player } from "@/types";
 import { sampleWorld } from "@/lib/lore-data";
 import { findEntity, updateWorld, addEntity, deleteEntity } from "@/lib/lore-ops";
 import { LoreTree, Selection } from "@/components/lore/lore-tree";
@@ -11,9 +11,10 @@ import { Loader2 } from "lucide-react";
 
 export default function LorePage() {
   const [world, setWorld, hydrated] = useServerState<World>("codex.world", sampleWorld());
+  const [players, , playersHydrated] = useServerState<Player[]>("codex.players", []);
   const [selection, setSelection] = useState<Selection>({ level: "world" });
 
-  if (!hydrated) {
+  if (!hydrated || !playersHydrated) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -55,6 +56,7 @@ export default function LorePage() {
           entity={entity}
           onChange={(patch) => setWorld((prev) => updateWorld(prev, selection, patch as Record<string, unknown>))}
           onDelete={handleDelete}
+          players={players}
         />
       </div>
     </div>

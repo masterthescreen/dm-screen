@@ -1,7 +1,7 @@
 "use client";
 
 import { useServerState } from "@/lib/server-storage";
-import { Monster, Encounter, Combatant } from "@/types";
+import { Monster, Encounter, Combatant, Player } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MonsterList } from "@/components/combat/monster-list";
 import { EncounterBuilder } from "@/components/combat/encounter-builder";
@@ -12,8 +12,9 @@ export default function CombatPage() {
   const [monsters, setMonsters, h1] = useServerState<Monster[]>("codex.monsters", []);
   const [encounters, setEncounters, h2] = useServerState<Encounter[]>("codex.encounters", []);
   const [combatants, setCombatants, h3] = useServerState<Combatant[]>("codex.combatants", []);
+  const [players, , h4] = useServerState<Player[]>("codex.players", []);
 
-  if (!h1 || !h2 || !h3) {
+  if (!h1 || !h2 || !h3 || !h4) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -36,7 +37,7 @@ export default function CombatPage() {
         </TabsList>
 
         <TabsContent value="initiative">
-          <InitiativeTracker combatants={combatants} onChange={setCombatants} />
+          <InitiativeTracker combatants={combatants} onChange={setCombatants} players={players} />
         </TabsContent>
 
         <TabsContent value="encounters">

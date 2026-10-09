@@ -1,10 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useServerState } from "@/lib/server-storage";
 import { GMNote, Player, Note } from "@/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GMNotes } from "@/components/notebooks/gm-notes";
-import { PlayerNotebooks } from "@/components/notebooks/player-notebooks";
 import { Loader2 } from "lucide-react";
 
 export default function NotebooksPage() {
@@ -26,24 +25,21 @@ export default function NotebooksPage() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <div className="mb-6 border-b border-border/60 pb-5">
-        <h1 className="font-display text-3xl font-bold">Notebooks</h1>
-        <p className="text-muted-foreground mt-1">Your private journal, and a line to every player at the table.</p>
+        <h1 className="font-display text-3xl font-bold">GM Notes</h1>
+        <p className="text-muted-foreground mt-1">
+          Your private journal. Send any note to a player&apos;s notebook.{" "}
+          {players.length === 0 && (
+            <>
+              No players yet —{" "}
+              <Link href="/players" className="underline text-primary">
+                add players
+              </Link>{" "}
+              to send notes.
+            </>
+          )}
+        </p>
       </div>
-
-      <Tabs defaultValue="gm">
-        <TabsList className="mb-6">
-          <TabsTrigger value="gm">GM Notes</TabsTrigger>
-          <TabsTrigger value="players">Players</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="gm">
-          <GMNotes notes={gmNotes} onChange={setGmNotes} players={players} onSend={sendNoteToPlayer} />
-        </TabsContent>
-
-        <TabsContent value="players">
-          <PlayerNotebooks players={players} onChange={setPlayers} />
-        </TabsContent>
-      </Tabs>
+      <GMNotes notes={gmNotes} onChange={setGmNotes} players={players} onSend={sendNoteToPlayer} />
     </div>
   );
 }

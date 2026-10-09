@@ -13,12 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Trash, Mail, KeyRound } from "lucide-react";
 
-interface PlayerNotebooksProps {
+function generatePasscode(): string {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+interface PlayerManagerProps {
   players: Player[];
   onChange: (players: Player[]) => void;
 }
 
-export function PlayerNotebooks({ players, onChange }: PlayerNotebooksProps) {
+export function PlayerManager({ players, onChange }: PlayerManagerProps) {
   const [activeId, setActiveId] = useState<string | undefined>(players[0]?.id);
   const [draft, setDraft] = useState(blankPlayer());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -91,7 +95,13 @@ export function PlayerNotebooks({ players, onChange }: PlayerNotebooksProps) {
                 </div>
                 <div className="space-y-1">
                   <Label>Login passcode (optional)</Label>
-                  <Input value={draft.passcode} onChange={(e) => setDraft({ ...draft, passcode: e.target.value })} />
+                  <div className="flex gap-2">
+                    <Input value={draft.passcode} onChange={(e) => setDraft({ ...draft, passcode: e.target.value })} />
+                    <Button type="button" variant="outline" onClick={() => setDraft({ ...draft, passcode: generatePasscode() })}>
+                      Generate
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Tell your player this passcode so they can log in.</p>
                 </div>
                 <Button onClick={addPlayer} disabled={!draft.playerName.trim()}>
                   Create Player

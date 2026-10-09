@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Swords, Dices, FileText, Scroll, User, Crown, LogOut } from "lucide-react";
+import { BookOpen, Swords, Dices, FileText, Scroll, User, Users, Crown, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth";
 import { useServerState } from "@/lib/server-storage";
@@ -11,9 +11,10 @@ import { Player } from "@/types";
 const gmNavItems = [
   { href: "/", label: "The Hearth", icon: Scroll },
   { href: "/lore", label: "Lore Codex", icon: BookOpen },
+  { href: "/players", label: "Players", icon: Users },
   { href: "/combat", label: "Combat Table", icon: Swords },
   { href: "/dice", label: "Dice Tower", icon: Dices },
-  { href: "/notebooks", label: "Notebooks", icon: FileText },
+  { href: "/notebooks", label: "GM Notes", icon: FileText },
 ];
 
 const playerNavItems = [

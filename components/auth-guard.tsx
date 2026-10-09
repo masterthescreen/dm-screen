@@ -6,7 +6,7 @@ import { useSession } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 
 const GM_ONLY_EXACT = ["/"];
-const GM_ONLY_PREFIXES = ["/lore", "/combat", "/notebooks"];
+const GM_ONLY_PREFIXES = ["/lore", "/players", "/combat", "/notebooks"];
 
 function isGmOnly(pathname: string): boolean {
   if (GM_ONLY_EXACT.includes(pathname)) return true;

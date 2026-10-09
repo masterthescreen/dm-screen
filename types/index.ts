@@ -1,6 +1,7 @@
 // ---------- Lore ----------
 export interface Shop {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   type: string;
   description: string;
@@ -9,6 +10,7 @@ export interface Shop {
 
 export interface Person {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   role: string;
   description: string;
@@ -17,6 +19,7 @@ export interface Person {
 
 export interface City {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   description: string;
   population: string;
@@ -26,6 +29,7 @@ export interface City {
 
 export interface Kingdom {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   description: string;
   ruler: string;
@@ -34,6 +38,7 @@ export interface Kingdom {
 
 export interface Continent {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   description: string;
   kingdoms: Kingdom[];
@@ -41,6 +46,7 @@ export interface Continent {
 
 export interface World {
   id: string;
+  sharedWith?: string[]; // player ids who can see this entry
   name: string;
   description: string;
   continents: Continent[];
@@ -64,6 +70,7 @@ export type CombatantKind = "pc" | "monster";
 
 export interface Combatant {
   id: string;
+  playerId?: string; // set when this combatant is a player character
   name: string;
   kind: CombatantKind;
   initiative: number;

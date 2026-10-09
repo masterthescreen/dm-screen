@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { World } from "@/types";
 import { cn } from "@/lib/utils";
-import { ChevronRight, ChevronDown, Globe, Map, Crown, Building, Package, User, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Globe, Map, Crown, Building, Package, User, Plus, Share } from "lucide-react";
 
 export interface Selection {
   level: "world" | "continent" | "kingdom" | "city" | "shop" | "person";
@@ -25,6 +25,7 @@ function Row({
   depth,
   icon: Icon,
   label,
+  shared,
   active,
   expandable,
   expanded,
@@ -34,6 +35,7 @@ function Row({
   depth: number;
   icon: React.ElementType;
   label: string;
+  shared?: boolean;
   active: boolean;
   expandable?: boolean;
   expanded?: boolean;
@@ -64,6 +66,7 @@ function Row({
       )}
       <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />
       <span className="truncate">{label}</span>
+      {shared && <Share className="h-3 w-3 shrink-0 opacity-70 ml-auto" aria-label="Shared with players" />}
     </div>
   );
 }
@@ -82,6 +85,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
         depth={0}
         icon={Globe}
         label={world.name}
+                    shared={!!world.sharedWith?.length}
         active={selection.level === "world"}
         onClick={() => onSelect({ level: "world" })}
       />
@@ -98,6 +102,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
             depth={1}
             icon={Map}
             label={continent.name}
+                    shared={!!continent.sharedWith?.length}
             active={selection.level === "continent" && selection.continentId === continent.id}
             expandable
             expanded={!!openContinents[continent.id]}
@@ -119,6 +124,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
                     depth={2}
                     icon={Crown}
                     label={kingdom.name}
+                    shared={!!kingdom.sharedWith?.length}
                     active={selection.level === "kingdom" && selection.kingdomId === kingdom.id}
                     expandable
                     expanded={!!openKingdoms[kingdom.id]}
@@ -144,6 +150,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
                             depth={3}
                             icon={Building}
                             label={city.name}
+                    shared={!!city.sharedWith?.length}
                             active={selection.level === "city" && selection.cityId === city.id}
                             expandable
                             expanded={!!openCities[city.id]}
@@ -179,6 +186,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
                                   depth={4}
                                   icon={Package}
                                   label={shop.name}
+                    shared={!!shop.sharedWith?.length}
                                   active={selection.level === "shop" && selection.shopId === shop.id}
                                   onClick={() =>
                                     onSelect({
@@ -211,6 +219,7 @@ export function LoreTree({ world, selection, onSelect, onAdd }: LoreTreeProps) {
                                   depth={4}
                                   icon={User}
                                   label={person.name}
+                    shared={!!person.sharedWith?.length}
                                   active={selection.level === "person" && selection.personId === person.id}
                                   onClick={() =>
                                     onSelect({

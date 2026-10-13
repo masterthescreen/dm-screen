@@ -9,6 +9,7 @@ import { CharacterSheetView } from "@/components/player/character-sheet-view";
 import { MyNotebook } from "@/components/player/my-notebook";
 import { SharedLoreView } from "@/components/player/shared-lore-view";
 import { AccountView } from "@/components/player/account-view";
+import { DdbSyncCard } from "@/components/player/ddb-sync-card";
 import { KeyRound, Loader2 } from "lucide-react";
 
 export default function PlayerPage() {
@@ -61,6 +62,7 @@ export default function PlayerPage() {
         </TabsList>
 
         <TabsContent value="character">
+          <DdbSyncCard player={player} onSynced={refresh} />
           <CharacterSheetView player={player} onSave={saveCharacter} />
         </TabsContent>
 

@@ -6,7 +6,7 @@ import { InvitePanel } from "@/components/players/invite-panel";
 import { Loader2 } from "lucide-react";
 
 export default function PlayersPage() {
-  const { players, loaded, create, patch, remove, resetCode, sendNote, deleteNote } = usePlayers();
+  const { players, loaded, refresh, create, patch, remove, resetCode, sendNote, deleteNote } = usePlayers();
 
   if (!loaded) {
     return (
@@ -28,7 +28,7 @@ export default function PlayersPage() {
       <div className="mb-6">
         <InvitePanel />
       </div>
-      <PlayerManager players={players} actions={{ create, patch, remove, resetCode, sendNote, deleteNote }} />
+      <PlayerManager players={players} actions={{ create, patch, remove, resetCode, sendNote, deleteNote, refresh }} />
     </div>
   );
 }

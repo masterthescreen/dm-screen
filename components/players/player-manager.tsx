@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CharacterSheet, Player } from "@/types";
 import { PlayerPatch, usePlayers } from "@/lib/use-players";
+import { DdbPanel } from "@/components/players/ddb-panel";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ interface IssuedCode {
   kind: "code" | "password";
 }
 
-type Actions = Pick<ReturnType<typeof usePlayers>, "create" | "patch" | "remove" | "resetCode" | "sendNote" | "deleteNote">;
+type Actions = Pick<ReturnType<typeof usePlayers>, "create" | "patch" | "remove" | "resetCode" | "sendNote" | "deleteNote" | "refresh">;
 
 interface PlayerManagerProps {
   players: Player[];
@@ -323,6 +324,14 @@ export function PlayerManager({ players, actions }: PlayerManagerProps) {
                   </div>
                 </CardContent>
               </Card>
+
+              <DdbPanel
+                player={active}
+                beforeAction={flush}
+                onChanged={async () => {
+                  await actionsRef.current.refresh();
+                }}
+              />
 
               <Card>
                 <CardHeader className="pb-3">

@@ -1,4 +1,5 @@
 import { CharacterSheet, Note, Player, RollRecord, StoredPlayer } from "@/types";
+import { DdbSnapshot, SheetChange, buildSheetUpdate } from "@/lib/server/ddb";
 import { readPlayers, withPlayers } from "@/lib/server/db";
 import { generatePlayerCode, generateTempPassword, hashPassword, hashPlayerCode } from "@/lib/server/crypto";
 
@@ -10,6 +11,7 @@ export function toPublic(p: StoredPlayer): Player {
     characterName: p.characterName,
     ...(p.username ? { username: p.username } : {}),
     ...(p.mustChangePassword ? { mustChangePassword: true } : {}),
+    ...(p.ddb ? { ddb: p.ddb } : {}),
     character: p.character,
     notes: p.notes,
     rolls: p.rolls,
@@ -196,4 +198,58 @@ export async function setRolls(id: string, rolls: RollRecord[]): Promise<boolean
     copy[idx] = { ...copy[idx], rolls };
     return { players: copy, result: true };
   });
+}
+
+// ---------- Linked character (external site) ----------
+
+/**
+ * Writes a snapshot onto a player's sheet. `link` also (re)points the player at
+ * this character; `sync` requires it to match the one already linked, so a
+ * re-sync can never switch characters.
+ */
+export async function applyDdb(
+  id: string,
+  snap: DdbSnapshot,
+  mode: "link" | "sync"
+): Promise<{ player: Player; changes: SheetChange[] } | null> {
+  type Out = { player: Player; changes: SheetChange[] } | null;
+  return withPlayers((players): { players: StoredPlayer[]; result: Out } => {
+    const idx = players.findIndex((p) => p.id === id);
+    if (idx === -1) return { players, result: null };
+    const cur = players[idx];
+    if (mode === "sync" && cur.ddb?.characterId !== snap.characterId) return { players, result: null };
+
+    const now = Date.now();
+    const firstTime = mode === "link" || !cur.ddb || cur.ddb.lastSyncedAt === null;
+    const { character, changes } = buildSheetUpdate(cur.character, snap, firstTime);
+    const next: StoredPlayer = {
+      ...cur,
+      character,
+      ddb: {
+        characterId: snap.characterId,
+        name: snap.name,
+        linkedAt: mode === "link" ? now : cur.ddb?.linkedAt ?? now,
+        lastSyncedAt: now,
+      },
+    };
+    const copy = [...players];
+    copy[idx] = next;
+    return { players: copy, result: { player: toPublic(next), changes } };
+  });
+}
+
+export async function unlinkDdb(id: string): Promise<boolean> {
+  return withPlayers((players) => {
+    const idx = players.findIndex((p) => p.id === id);
+    if (idx === -1 || !players[idx].ddb) return { players, result: false };
+    const { ddb: _removed, ...rest } = players[idx];
+    void _removed;
+    const copy = [...players];
+    copy[idx] = rest as StoredPlayer;
+    return { players: copy, result: true };
+  });
+}
+
+export async function getStored(id: string): Promise<StoredPlayer | null> {
+  return (await readPlayers()).find((p) => p.id === id) ?? null;
 }

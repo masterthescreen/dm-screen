@@ -50,3 +50,23 @@ export function recordFailure(key: string) {
 export function clearFailures(key: string) {
   buckets.delete(key);
 }
+
+// ---------- Generic "N per window" limiter (used for outbound lookups) ----------
+
+const hits = new Map<string, number[]>();
+
+/** Allows up to `max` calls per `windowMs` for `key`. Returns how long to wait if over. */
+export function takeToken(key: string, max: number, windowMs: number): { ok: boolean; retryAfterSec: number } {
+  const now = Date.now();
+  const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= max) {
+    hits.set(key, recent);
+    return { ok: false, retryAfterSec: Math.max(1, Math.ceil((recent[0] + windowMs - now) / 1000)) };
+  }
+  recent.push(now);
+  hits.set(key, recent);
+  if (hits.size > 5000) {
+    for (const [k, v] of hits) if (v.every((t) => now - t >= windowMs)) hits.delete(k);
+  }
+  return { ok: true, retryAfterSec: 0 };
+}

@@ -150,12 +150,21 @@ export interface CharacterSheet {
   backstory: string;
 }
 
+// A character on the external site linked to a player (set by the GM).
+export interface DdbLink {
+  characterId: string;
+  name: string; // the character's name over there
+  linkedAt: number;
+  lastSyncedAt: number | null;
+}
+
 export interface Player {
   id: string;
   playerName: string;
   characterName: string;
   username?: string; // set for players who signed up with a username + password
   mustChangePassword?: boolean; // true after the GM resets their password
+  ddb?: DdbLink;
   character: CharacterSheet;
   notes: Note[];
   rolls: RollRecord[]; // this player's own dice history (private to them and the GM)

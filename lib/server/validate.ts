@@ -94,3 +94,32 @@ export function cleanRolls(input: unknown): RollRecord[] | null {
   }
   return out;
 }
+
+// ---------- Accounts ----------
+
+const USERNAME_RE = /^[a-z0-9][a-z0-9._-]{2,23}$/;
+
+/** Usernames are case-insensitive: stored lowercase, 3-24 chars of a-z 0-9 . _ - */
+export function cleanUsername(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const u = v.trim().toLowerCase();
+  return USERNAME_RE.test(u) ? u : null;
+}
+
+const COMMON_PASSWORDS = new Set([
+  "password", "password1", "password123", "12345678", "123456789", "1234567890", "qwertyui", "qwerty123",
+  "iloveyou", "letmein1", "admin123", "welcome1", "abc12345", "11111111", "00000000", "dragon123",
+  "dungeons1", "dungeonsanddragons", "dndplayer", "baseball1", "football1", "monkey123", "trustno1",
+]);
+
+/** Returns an error message, or null if the password is acceptable. */
+export function passwordProblem(password: unknown, username?: string): string | null {
+  if (typeof password !== "string") return "Enter a password.";
+  if (password.length < 8) return "Use at least 8 characters.";
+  if (password.length > 200) return "That password is too long.";
+  const lower = password.toLowerCase();
+  if (COMMON_PASSWORDS.has(lower)) return "That password is too common. Pick something less guessable.";
+  if (username && lower.includes(username.toLowerCase()) && username.length >= 4) return "Your password shouldn't contain your username.";
+  if (/^(.)\1+$/.test(password)) return "Use a mix of different characters.";
+  return null;
+}

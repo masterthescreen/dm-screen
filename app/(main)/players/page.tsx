@@ -2,6 +2,7 @@
 
 import { usePlayers } from "@/lib/use-players";
 import { PlayerManager } from "@/components/players/player-manager";
+import { InvitePanel } from "@/components/players/invite-panel";
 import { Loader2 } from "lucide-react";
 
 export default function PlayersPage() {
@@ -20,9 +21,12 @@ export default function PlayersPage() {
       <div className="mb-6 border-b border-border/60 pb-5">
         <h1 className="font-display text-3xl font-bold">Players</h1>
         <p className="text-muted-foreground mt-1">
-          Add the people at your table. Each gets a private sign-in code (shown once when you create them). Share lore
-          with them from the Lore Codex.
+          Create an invite code so players can make their own accounts, or add a player yourself. Share lore with them
+          from the Lore Codex.
         </p>
+      </div>
+      <div className="mb-6">
+        <InvitePanel />
       </div>
       <PlayerManager players={players} actions={{ create, patch, remove, resetCode, sendNote, deleteNote }} />
     </div>

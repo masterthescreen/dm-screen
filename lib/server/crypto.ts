@@ -55,6 +55,17 @@ export async function verifyGmPasscode(passcode: string, stored: string): Promis
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
+// Players' own passwords use the same salted scrypt scheme as the GM passcode.
+export const hashPassword = hashGmPasscode;
+export const verifyPassword = verifyGmPasscode;
+
+let dummyHash: Promise<string> | null = null;
+/** A real hash of a throwaway value, so "no such user" costs the same time as "wrong password". */
+export function getDummyHash(): Promise<string> {
+  if (!dummyHash) dummyHash = hashGmPasscode(crypto.randomBytes(16).toString("hex"));
+  return dummyHash;
+}
+
 // ---------- Player access codes (server-generated, high entropy) ----------
 
 // No 0/O/1/I/L so codes are easy to read out and type on a phone.
@@ -67,8 +78,31 @@ export function generatePlayerCode(): string {
   return `${out.slice(0, 4)}-${out.slice(4)}`;
 }
 
+function randomCode(length: number): string {
+  let out = "";
+  for (let i = 0; i < length; i++) out += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
+  return out;
+}
+
+/** Invite codes are 10 characters (~50 bits), shown as XXXXX-XXXXX. */
+export function generateInviteCode(): string {
+  const c = randomCode(10);
+  return `${c.slice(0, 5)}-${c.slice(5)}`;
+}
+
+/** One-time temporary password issued when the GM resets a player's password. */
+export function generateTempPassword(): string {
+  const c = randomCode(12);
+  return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}`;
+}
+
 export function normalizeCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export async function hashInviteCode(code: string): Promise<string> {
+  const secret = await getSecret();
+  return crypto.createHmac("sha256", secret).update(`invite:${normalizeCode(code)}`).digest("hex");
 }
 
 export async function hashPlayerCode(code: string): Promise<string> {

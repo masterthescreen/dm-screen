@@ -1,8 +1,9 @@
-import { hashPlayerCode, normalizeCode, safeEqual, verifyGmPasscode } from "@/lib/server/crypto";
+import { getDummyHash, hashPlayerCode, normalizeCode, safeEqual, verifyGmPasscode, verifyPassword } from "@/lib/server/crypto";
 import { getAuthValue, readPlayers } from "@/lib/server/db";
 import { checkLimit, clearFailures, clientIp, recordFailure } from "@/lib/server/ratelimit";
 import { fail, json, originAllowed, readJson, startSession } from "@/lib/server/session";
-import { isPlainObject } from "@/lib/server/validate";
+import { findByUsername } from "@/lib/server/players";
+import { cleanUsername, isPlainObject } from "@/lib/server/validate";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -34,6 +35,19 @@ export async function POST(req: Request) {
     clearFailures(ipKey);
     const res = json({ success: true, role: "gm" });
     await startSession(res, { role: "gm" });
+    return res;
+  }
+
+  if (body.type === "password") {
+    const username = cleanUsername(body.username);
+    const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
+    const player = username ? await findByUsername(username) : null;
+    // Always do one full password check, even for unknown users, so timing doesn't reveal who exists.
+    const ok = await verifyPassword(password, player?.passHash ?? (await getDummyHash()));
+    if (!player || !player.passHash || !ok) return reject("Incorrect username or password.");
+    clearFailures(ipKey);
+    const res = json({ success: true, role: "player" });
+    await startSession(res, { role: "player", playerId: player.id, codeVersion: player.codeVersion });
     return res;
   }
 

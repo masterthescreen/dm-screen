@@ -154,6 +154,8 @@ export interface Player {
   id: string;
   playerName: string;
   characterName: string;
+  username?: string; // set for players who signed up with a username + password
+  mustChangePassword?: boolean; // true after the GM resets their password
   character: CharacterSheet;
   notes: Note[];
   rolls: RollRecord[]; // this player's own dice history (private to them and the GM)
@@ -161,7 +163,8 @@ export interface Player {
 
 // Server-side record. `codeHash` never leaves the server.
 export interface StoredPlayer extends Player {
-  codeHash: string; // keyed hash of the player's access code
+  codeHash: string; // keyed hash of a GM-issued access code ("" for password players)
+  passHash?: string; // salted scrypt hash of the player's password
   codeVersion: number; // bumped when the code is reset, invalidating old sessions
 }
 

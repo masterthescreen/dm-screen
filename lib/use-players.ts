@@ -59,8 +59,7 @@ export function usePlayers() {
   );
 
   const resetCode = useCallback(async (id: string) => {
-    const res = await api<{ code: string }>(`/api/gm/players/${id}/reset-code`, { method: "POST" });
-    return res.code;
+    return api<{ secret: string; kind: "code" | "password" }>(`/api/gm/players/${id}/reset-code`, { method: "POST" });
   }, []);
 
   const sendNote = useCallback(

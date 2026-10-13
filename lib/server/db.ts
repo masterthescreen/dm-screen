@@ -91,6 +91,20 @@ export async function getAuthValue(key: string): Promise<string | null> {
   return rows.length ? (rows[0].auth_value as string) : null;
 }
 
+export async function setAuthValue(key: string, value: string): Promise<void> {
+  await ensureTables();
+  await getPool().query(
+    `INSERT INTO codex_auth (auth_key, auth_value) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE auth_value = VALUES(auth_value)`,
+    [key, value]
+  );
+}
+
+export async function deleteAuthValue(key: string): Promise<void> {
+  await ensureTables();
+  await getPool().query("DELETE FROM codex_auth WHERE auth_key = ?", [key]);
+}
+
 /** Inserts only if the key doesn't exist yet. Returns true if this call created it. */
 export async function insertAuthValueIfAbsent(key: string, value: string): Promise<boolean> {
   await ensureTables();

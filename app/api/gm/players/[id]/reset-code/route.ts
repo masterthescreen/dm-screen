@@ -1,13 +1,14 @@
-import { resetCode } from "@/lib/server/players";
+import { resetCredential } from "@/lib/server/players";
 import { fail, json, requireGm } from "@/lib/server/session";
 
-// Issues a new access code (shown once). The old code and any signed-in
-// session for that player stop working immediately.
+// Resets a player's sign-in. Code players get a new access code; password
+// players get a one-time temporary password they must replace. The secret is
+// shown once; the old credential and any signed-in session stop working now.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireGm(req);
   if (!guard.ok) return guard.res;
   const { id } = await params;
-  const code = await resetCode(id);
-  if (!code) return fail(404, "Player not found");
-  return json({ code });
+  const result = await resetCredential(id);
+  if (!result) return fail(404, "Player not found");
+  return json({ secret: result.secret, kind: result.kind });
 }

@@ -1,6 +1,6 @@
 import { getState } from "@/lib/server/db";
 import { toPublic } from "@/lib/server/players";
-import { fail, getSession, json } from "@/lib/server/session";
+import { getSession, json, notSignedIn } from "@/lib/server/session";
 import { collectSharedLore } from "@/lib/shared-lore";
 import { World } from "@/types";
 
@@ -9,7 +9,7 @@ import { World } from "@/types";
 // never leaves the server for a player.
 export async function GET(req: Request) {
   const session = await getSession(req);
-  if (!session) return fail(401, "Not signed in");
+  if (!session) return notSignedIn();
   if (session.role === "gm") return json({ role: "gm" });
 
   const world = await getState<World | null>("codex.world", null);

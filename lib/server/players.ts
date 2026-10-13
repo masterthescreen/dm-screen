@@ -1,6 +1,6 @@
 import { CharacterSheet, Note, Player, RollRecord, StoredPlayer } from "@/types";
 import { readPlayers, withPlayers } from "@/lib/server/db";
-import { generatePlayerCode, hashPlayerCode } from "@/lib/server/crypto";
+import { generatePlayerCode, generateTempPassword, hashPassword, hashPlayerCode } from "@/lib/server/crypto";
 
 export function toPublic(p: StoredPlayer): Player {
   // Explicit allow-list: never spread the stored record, so new secret fields can't leak by accident.
@@ -8,6 +8,8 @@ export function toPublic(p: StoredPlayer): Player {
     id: p.id,
     playerName: p.playerName,
     characterName: p.characterName,
+    ...(p.username ? { username: p.username } : {}),
+    ...(p.mustChangePassword ? { mustChangePassword: true } : {}),
     character: p.character,
     notes: p.notes,
     rolls: p.rolls,
@@ -51,7 +53,11 @@ export async function createPlayer(playerName: string, characterName: string): P
     codeHash,
     codeVersion: 1,
   };
-  await withPlayers((players) => ({ players: [...players, stored], result: null }));
+  const added = await withPlayers((players) => {
+    if (players.length >= MAX_PLAYERS) return { players, result: false };
+    return { players: [...players, stored], result: true };
+  });
+  if (!added) throw new Error("table_full");
   return { player: toPublic(stored), code };
 }
 
@@ -82,18 +88,81 @@ export async function removePlayer(id: string): Promise<boolean> {
   });
 }
 
-/** Issues a fresh access code. The old code and any signed-in session stop working. */
-export async function resetCode(id: string): Promise<string | null> {
+/**
+ * Resets a player's sign-in. Code players get a fresh access code; password
+ * players get a one-time temporary password and must choose a new one. Either
+ * way the old credential and every signed-in session stop working at once.
+ */
+export async function resetCredential(id: string): Promise<{ secret: string; kind: "code" | "password" } | null> {
   const code = generatePlayerCode();
-  const codeHash = await hashPlayerCode(code);
-  const ok = await withPlayers((players) => {
+  const temp = generateTempPassword();
+  const [codeHash, tempHash] = await Promise.all([hashPlayerCode(code), hashPassword(temp)]);
+  type Reset = { secret: string; kind: "code" | "password" } | null;
+  return withPlayers((players): { players: StoredPlayer[]; result: Reset } => {
     const idx = players.findIndex((p) => p.id === id);
-    if (idx === -1) return { players, result: false };
+    if (idx === -1) return { players, result: null };
+    const cur = players[idx];
     const copy = [...players];
-    copy[idx] = { ...copy[idx], codeHash, codeVersion: copy[idx].codeVersion + 1 };
-    return { players: copy, result: true };
+    if (cur.username) {
+      copy[idx] = { ...cur, passHash: tempHash, mustChangePassword: true, codeVersion: cur.codeVersion + 1 };
+      return { players: copy, result: { secret: temp, kind: "password" } };
+    }
+    copy[idx] = { ...cur, codeHash, codeVersion: cur.codeVersion + 1 };
+    return { players: copy, result: { secret: code, kind: "code" } };
   });
-  return ok ? code : null;
+}
+
+export const MAX_PLAYERS = 40;
+
+export type SignupResult =
+  | { ok: true; player: StoredPlayer }
+  | { ok: false; reason: "username_taken" | "table_full" };
+
+/** Creates a player who signed up themselves. Username uniqueness is checked inside the locked transaction. */
+export async function createAccountPlayer(args: {
+  username: string;
+  password: string;
+  playerName: string;
+  characterName: string;
+}): Promise<SignupResult> {
+  const passHash = await hashPassword(args.password);
+  const stored: StoredPlayer = {
+    id: crypto.randomUUID(),
+    playerName: args.playerName,
+    characterName: args.characterName,
+    username: args.username,
+    character: blankCharacter(),
+    notes: [],
+    rolls: [],
+    codeHash: "",
+    passHash,
+    codeVersion: 1,
+  };
+  return withPlayers((players): { players: StoredPlayer[]; result: SignupResult } => {
+    if (players.length >= MAX_PLAYERS) return { players, result: { ok: false, reason: "table_full" } };
+    if (players.some((p) => p.username === args.username)) {
+      return { players, result: { ok: false, reason: "username_taken" } };
+    }
+    return { players: [...players, stored], result: { ok: true, player: stored } };
+  });
+}
+
+export async function findByUsername(username: string): Promise<StoredPlayer | null> {
+  return (await readPlayers()).find((p) => p.username === username) ?? null;
+}
+
+/** Sets a new password, clears the must-change flag, and ends every other session (version bump). */
+export async function changePassword(id: string, newPassword: string): Promise<StoredPlayer | null> {
+  const passHash = await hashPassword(newPassword);
+  return withPlayers((players) => {
+    const idx = players.findIndex((p) => p.id === id);
+    if (idx === -1) return { players, result: null };
+    const cur = players[idx];
+    const next: StoredPlayer = { ...cur, passHash, mustChangePassword: false, codeVersion: cur.codeVersion + 1 };
+    const copy = [...players];
+    copy[idx] = next;
+    return { players: copy, result: next };
+  });
 }
 
 export async function addNote(id: string, note: Note): Promise<Note | null> {

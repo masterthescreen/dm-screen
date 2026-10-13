@@ -26,10 +26,11 @@ export async function api<T = unknown>(
     /* empty body */
   }
   if (!res.ok) {
-    const message =
-      data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : `Request failed (${res.status})`;
-    // Session ended (expired, code reset, player removed): go back to sign-in.
-    if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/") && path !== "/api/me") {
+    const body = data && typeof data === "object" ? (data as { error?: unknown; code?: unknown }) : {};
+    const message = body.error !== undefined ? String(body.error) : `Request failed (${res.status})`;
+    // Only a genuinely ended session sends you back to sign-in. Other 401s (like a wrong
+    // password) are shown to the user where they happened.
+    if (body.code === "not_signed_in" && typeof window !== "undefined" && path !== "/api/me") {
       window.location.assign("/login");
     }
     throw new ApiError(res.status, message);

@@ -17,8 +17,10 @@ import { Plus, Trash, Mail, KeyRound, Copy, Check, AlertCircle, RefreshCw } from
 interface IssuedCode {
   playerName: string;
   characterName: string;
+  username?: string;
   code: string;
   reset: boolean;
+  kind: "code" | "password";
 }
 
 type Actions = Pick<ReturnType<typeof usePlayers>, "create" | "patch" | "remove" | "resetCode" | "sendNote" | "deleteNote">;
@@ -115,16 +117,27 @@ export function PlayerManager({ players, actions }: PlayerManagerProps) {
       setNewPlayer({ playerName: "", characterName: "" });
       setDialogOpen(false);
       setCopied(false);
-      setIssued({ playerName: res.player.playerName, characterName: res.player.characterName, code: res.code, reset: false });
+      setIssued({ playerName: res.player.playerName, characterName: res.player.characterName, code: res.code, reset: false, kind: "code" });
     });
 
   const resetCode = () =>
     run(async () => {
       if (!active) return;
-      if (!window.confirm(`Issue a new code for ${active.characterName}? Their current code and any signed-in session stop working.`)) return;
-      const code = await actions.resetCode(active.id);
+      const isPassword = !!active.username;
+      const warning = isPassword
+        ? `Reset ${active.characterName}'s password? They'll get a temporary one and must choose a new password. Any signed-in session ends now.`
+        : `Issue a new code for ${active.characterName}? Their current code and any signed-in session stop working.`;
+      if (!window.confirm(warning)) return;
+      const res = await actions.resetCode(active.id);
       setCopied(false);
-      setIssued({ playerName: active.playerName, characterName: active.characterName, code, reset: true });
+      setIssued({
+        playerName: active.playerName,
+        characterName: active.characterName,
+        username: active.username,
+        code: res.secret,
+        reset: true,
+        kind: res.kind,
+      });
     });
 
   const removePlayer = () =>
@@ -173,10 +186,22 @@ export function PlayerManager({ players, actions }: PlayerManagerProps) {
       <Dialog open={!!issued} onOpenChange={(open) => !open && setIssued(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-display">{issued?.reset ? "New player code" : "Player created"}</DialogTitle>
+            <DialogTitle className="font-display">
+              {issued?.kind === "password" ? "Temporary password" : issued?.reset ? "New player code" : "Player created"}
+            </DialogTitle>
             <DialogDescription>
-              Give this code to {issued?.playerName} so they can sign in as {issued?.characterName}. It&apos;s shown only
-              once and can&apos;t be looked up later. If it&apos;s lost, reset it.
+              {issued?.kind === "password" ? (
+                <>
+                  Give this temporary password to {issued?.playerName}. They sign in with the username{" "}
+                  <strong>{issued?.username}</strong> and are asked to choose a new password. It&apos;s shown only once;
+                  if it&apos;s lost, reset it again.
+                </>
+              ) : (
+                <>
+                  Give this code to {issued?.playerName} so they can sign in as {issued?.characterName}. It&apos;s shown
+                  only once and can&apos;t be looked up later. If it&apos;s lost, reset it.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-2">
@@ -204,7 +229,7 @@ export function PlayerManager({ players, actions }: PlayerManagerProps) {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle className="font-display">New Player</DialogTitle>
-                  <DialogDescription>A sign-in code is generated for them when you create the player.</DialogDescription>
+                  <DialogDescription>For a player you&apos;re setting up yourself. They sign in with a code you give them. Or let them sign themselves up with an invite code instead.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
                   <div className="space-y-1">
@@ -281,10 +306,19 @@ export function PlayerManager({ players, actions }: PlayerManagerProps) {
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
                     <p className="text-xs text-muted-foreground">
-                      Sign-in code: <span className="font-mono">••••-••••</span> (hidden for security)
+                      {active.username ? (
+                        <>
+                          Username: <span className="font-mono text-foreground">{active.username}</span> &middot; password hidden
+                          {active.mustChangePassword && <span className="ml-2 text-accent">(waiting for them to choose a new one)</span>}
+                        </>
+                      ) : (
+                        <>
+                          Sign-in code: <span className="font-mono">{"\u2022\u2022\u2022\u2022-\u2022\u2022\u2022\u2022"}</span> (hidden for security)
+                        </>
+                      )}
                     </p>
                     <Button variant="outline" size="sm" onClick={resetCode}>
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Reset code
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> {active.username ? "Reset password" : "Reset code"}
                     </Button>
                   </div>
                 </CardContent>

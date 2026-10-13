@@ -29,6 +29,15 @@ export function fail(status: number, message: string, headers?: Record<string, s
   return json({ error: message }, { status, headers });
 }
 
+/**
+ * "You aren't signed in (any more)". Carries a machine-readable code so the
+ * browser can tell this apart from other 401s, such as a wrong password,
+ * which must show a message instead of sending people to the login page.
+ */
+export function notSignedIn() {
+  return json({ error: "Not signed in", code: "not_signed_in" }, { status: 401 });
+}
+
 const cookieBase = {
   httpOnly: true,
   sameSite: "lax" as const,
@@ -63,8 +72,8 @@ export async function getSession(
   if (payload.r === "gm") return { role: "gm" };
   if (!payload.p) return null;
   const player = (await readPlayers()).find((p) => p.id === payload.p);
-  // A deleted player, or one whose code was reset, loses access immediately.
-  if (!player || !player.codeHash || player.codeVersion !== payload.v) return null;
+  // A deleted player, or one whose code/password was reset or changed, loses access immediately.
+  if (!player || (!player.codeHash && !player.passHash) || player.codeVersion !== payload.v) return null;
   return { role: "player", player };
 }
 
@@ -90,7 +99,7 @@ type PlayerGuard = { ok: true; player: StoredPlayer } | { ok: false; res: NextRe
 export async function requireGm(req: Request): Promise<GmGuard> {
   if (!originAllowed(req)) return { ok: false, res: fail(403, "Cross-site request blocked") };
   const s = await getSession(req);
-  if (!s) return { ok: false, res: fail(401, "Not signed in") };
+  if (!s) return { ok: false, res: notSignedIn() };
   if (s.role !== "gm") return { ok: false, res: fail(403, "GM access only") };
   return { ok: true };
 }
@@ -98,7 +107,7 @@ export async function requireGm(req: Request): Promise<GmGuard> {
 export async function requirePlayer(req: Request): Promise<PlayerGuard> {
   if (!originAllowed(req)) return { ok: false, res: fail(403, "Cross-site request blocked") };
   const s = await getSession(req);
-  if (!s) return { ok: false, res: fail(401, "Not signed in") };
+  if (!s) return { ok: false, res: notSignedIn() };
   if (s.role !== "player") return { ok: false, res: fail(403, "Player access only") };
   return { ok: true, player: s.player };
 }

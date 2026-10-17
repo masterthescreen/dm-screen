@@ -1,4 +1,5 @@
-import { getState, setState } from "@/lib/server/db";
+import { revision } from "@/lib/server/nyxi-policy";
+import { compareAndSetState, getState } from "@/lib/server/db";
 import { fail, json, readJson, requireGm } from "@/lib/server/session";
 import { isPlainObject } from "@/lib/server/validate";
 
@@ -16,25 +17,48 @@ const SHAPES: Record<string, "object" | "array"> = {
 
 const MAX_BYTES = 2_000_000;
 
-export async function GET(req: Request, { params }: { params: Promise<{ key: string }> }) {
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ key: string }> },
+) {
   const guard = await requireGm(req);
   if (!guard.ok) return guard.res;
   const { key } = await params;
   if (!(key in SHAPES)) return fail(404, "Unknown data set");
-  return json({ value: await getState(`codex.${key}`, null) });
+  const value = await getState(`codex.${key}`, null);
+  return json({ value, revision: revision(value) });
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ key: string }> }) {
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ key: string }> },
+) {
   const guard = await requireGm(req);
   if (!guard.ok) return guard.res;
   const { key } = await params;
   const shape = SHAPES[key];
   if (!shape) return fail(404, "Unknown data set");
   const body = await readJson(req, MAX_BYTES);
-  if (!isPlainObject(body) || !("value" in body)) return fail(400, "Invalid request");
+  if (!isPlainObject(body) || !("value" in body))
+    return fail(400, "Invalid request");
   const value = body.value;
-  const okShape = shape === "array" ? Array.isArray(value) : isPlainObject(value);
+  const okShape =
+    shape === "array" ? Array.isArray(value) : isPlainObject(value);
   if (!okShape) return fail(400, `Expected ${shape}`);
-  await setState(`codex.${key}`, value);
-  return json({ success: true });
+  if (typeof body.revision !== "string")
+    return fail(
+      409,
+      "Reload this page before saving; a data revision is required.",
+    );
+  const nextRevision = await compareAndSetState(
+    `codex.${key}`,
+    value,
+    body.revision,
+  );
+  if (!nextRevision)
+    return fail(
+      409,
+      "Campaign data changed elsewhere. Copy your unsaved edits, then reload before saving.",
+    );
+  return json({ success: true, revision: nextRevision });
 }

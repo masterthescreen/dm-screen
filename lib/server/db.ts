@@ -12,7 +12,7 @@ const PLAYERS_KEY = "codex.players";
 let pool: mysql.Pool | null = null;
 let ready: Promise<void> | null = null;
 
-function getPool(): mysql.Pool {
+export function getPool(): mysql.Pool {
   if (!pool) {
     pool = mysql.createPool({
       host: process.env.DB_HOST || "127.0.0.1",
@@ -28,7 +28,7 @@ function getPool(): mysql.Pool {
   return pool;
 }
 
-async function ensureTables(): Promise<void> {
+export async function ensureTables(): Promise<void> {
   if (!ready) {
     ready = (async () => {
       const p = getPool();
@@ -37,16 +37,24 @@ async function ensureTables(): Promise<void> {
           state_key VARCHAR(64) PRIMARY KEY,
           state_value LONGTEXT,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
       );
       await p.query(
         `CREATE TABLE IF NOT EXISTS codex_auth (
           auth_key VARCHAR(32) PRIMARY KEY,
           auth_value TEXT NOT NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
       );
+      await p.query(`CREATE TABLE IF NOT EXISTS codex_nyxi_audit (
+        id VARCHAR(36) PRIMARY KEY, state_key VARCHAR(64) NOT NULL,
+        actor VARCHAR(32) NOT NULL, reason VARCHAR(1000) NOT NULL,
+        before_value LONGTEXT NOT NULL, after_value LONGTEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
       // Earlier versions kept the GM passcode in plain text here. Remove it.
-      await p.query("DELETE FROM codex_state WHERE state_key = 'codex.gmpasscode'");
+      await p.query(
+        "DELETE FROM codex_state WHERE state_key = 'codex.gmpasscode'",
+      );
     })().catch((err) => {
       ready = null; // allow a retry on the next request
       throw err;
@@ -61,7 +69,7 @@ export async function getState<T>(key: string, fallback: T): Promise<T> {
   await ensureTables();
   const [rows] = await getPool().query<mysql.RowDataPacket[]>(
     "SELECT state_value FROM codex_state WHERE state_key = ? LIMIT 1",
-    [key]
+    [key],
   );
   if (rows.length === 0) return fallback;
   try {
@@ -76,7 +84,7 @@ export async function setState<T>(key: string, value: T): Promise<void> {
   await getPool().query(
     `INSERT INTO codex_state (state_key, state_value) VALUES (?, ?)
      ON DUPLICATE KEY UPDATE state_value = VALUES(state_value)`,
-    [key, JSON.stringify(value)]
+    [key, JSON.stringify(value)],
   );
 }
 
@@ -86,7 +94,7 @@ export async function getAuthValue(key: string): Promise<string | null> {
   await ensureTables();
   const [rows] = await getPool().query<mysql.RowDataPacket[]>(
     "SELECT auth_value FROM codex_auth WHERE auth_key = ? LIMIT 1",
-    [key]
+    [key],
   );
   return rows.length ? (rows[0].auth_value as string) : null;
 }
@@ -96,7 +104,7 @@ export async function setAuthValue(key: string, value: string): Promise<void> {
   await getPool().query(
     `INSERT INTO codex_auth (auth_key, auth_value) VALUES (?, ?)
      ON DUPLICATE KEY UPDATE auth_value = VALUES(auth_value)`,
-    [key, value]
+    [key, value],
   );
 }
 
@@ -106,11 +114,14 @@ export async function deleteAuthValue(key: string): Promise<void> {
 }
 
 /** Inserts only if the key doesn't exist yet. Returns true if this call created it. */
-export async function insertAuthValueIfAbsent(key: string, value: string): Promise<boolean> {
+export async function insertAuthValueIfAbsent(
+  key: string,
+  value: string,
+): Promise<boolean> {
   await ensureTables();
   const [result] = await getPool().query<mysql.ResultSetHeader>(
     "INSERT IGNORE INTO codex_auth (auth_key, auth_value) VALUES (?, ?)",
-    [key, value]
+    [key, value],
   );
   return result.affectedRows === 1;
 }
@@ -145,7 +156,7 @@ export async function readPlayers(): Promise<StoredPlayer[]> {
   await ensureTables();
   const [rows] = await getPool().query<mysql.RowDataPacket[]>(
     "SELECT state_value FROM codex_state WHERE state_key = ? LIMIT 1",
-    [PLAYERS_KEY]
+    [PLAYERS_KEY],
   );
   return parsePlayers(rows[0]?.state_value);
 }
@@ -156,28 +167,68 @@ export async function readPlayers(): Promise<StoredPlayer[]> {
  * overwrite each other. `fn` returns the new list and a result to hand back.
  */
 export async function withPlayers<T>(
-  fn: (players: StoredPlayer[]) => { players: StoredPlayer[]; result: T }
+  fn: (players: StoredPlayer[]) => { players: StoredPlayer[]; result: T },
 ): Promise<T> {
   await ensureTables();
   const conn = await getPool().getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query("INSERT IGNORE INTO codex_state (state_key, state_value) VALUES (?, '[]')", [PLAYERS_KEY]);
+    await conn.query(
+      "INSERT IGNORE INTO codex_state (state_key, state_value) VALUES (?, '[]')",
+      [PLAYERS_KEY],
+    );
     const [rows] = await conn.query<mysql.RowDataPacket[]>(
       "SELECT state_value FROM codex_state WHERE state_key = ? FOR UPDATE",
-      [PLAYERS_KEY]
+      [PLAYERS_KEY],
     );
     const current = parsePlayers(rows[0]?.state_value);
     const { players, result } = fn(current);
-    await conn.query("UPDATE codex_state SET state_value = ? WHERE state_key = ?", [
-      JSON.stringify(players),
-      PLAYERS_KEY,
-    ]);
+    await conn.query(
+      "UPDATE codex_state SET state_value = ? WHERE state_key = ?",
+      [JSON.stringify(players), PLAYERS_KEY],
+    );
     await conn.commit();
     return result;
   } catch (err) {
     await conn.rollback();
     throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+/** Compare-and-swap browser writes against the same lock as Nyxi. */
+export async function compareAndSetState(
+  key: string,
+  value: unknown,
+  expected: string,
+): Promise<string | null> {
+  const { revision } = await import("@/lib/server/nyxi-policy");
+  await ensureTables();
+  const conn = await getPool().getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      "INSERT IGNORE INTO codex_state (state_key,state_value) VALUES (?, 'null')",
+      [key],
+    );
+    const [rows] = await conn.query<mysql.RowDataPacket[]>(
+      "SELECT state_value FROM codex_state WHERE state_key=? FOR UPDATE",
+      [key],
+    );
+    if (revision(JSON.parse(rows[0].state_value)) !== expected) {
+      await conn.rollback();
+      return null;
+    }
+    await conn.query("UPDATE codex_state SET state_value=? WHERE state_key=?", [
+      JSON.stringify(value),
+      key,
+    ]);
+    await conn.commit();
+    return revision(value);
+  } catch (e) {
+    await conn.rollback();
+    throw e;
   } finally {
     conn.release();
   }

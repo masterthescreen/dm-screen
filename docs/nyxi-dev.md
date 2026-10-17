@@ -29,4 +29,6 @@ Chat permits one entry mutation per turn, reads relevant datasets on demand (160
 
 Live API/database and visual browser tests must be run in dev: no production credentials were used during implementation.
 
-The existing Next.js 15.3.3 dependency produced a known security advisory during installation. This branch preserves dependency versions; patch Next.js before a production rollout.
+Next.js and eslint-config-next are pinned to 15.5.28, replacing 15.3.3. This includes the October 14, 2026 Next.js security fixes. Reinstall dependencies and rebuild when deploying this update.
+
+The Next.js security update also pins its transitive PostCSS dependency to 8.5.30 and refreshes Sharp to 0.35.5 within Next.js's supported range. Use Node.js 20.9 or newer for Sharp 0.35.5.
